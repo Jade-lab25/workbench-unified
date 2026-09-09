@@ -2,7 +2,7 @@
 
 将三个个人应用 **合并独立化重写** 为一套统一工作台：
 
-- **Achievement 工作状态**（gswdb.cn：待办 / 打卡 / 时间 / 成就 / 商店 / 灵感）
+- **Achievement 工作状态**（待办 / 打卡 / 时间 / 成就 / 商店 / 灵感）
 - **FocusDesk 目标待办**（目标 / 任务看板 / 习惯打卡）
 - **SummaryDesk 内容总结**（素材库 + LLM 生成日报/周报）
 
@@ -51,7 +51,7 @@
 
 1. **数据库**：Supabase SQL Editor 执行 `app/supabase-migration-unified.sql`（补新 8 表，幂等）
 2. **前端**：Vercel 导入本仓库 → Root Directory 设为 `app` → 环境变量 `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`（见 `.env.example`）
-3. **域名**：绑定 gswdb.cn / www.gswdb.cn（已解析到 Vercel，DNS 无需改动）
+3. **域名**：绑定 自定义域名（已解析到 Vercel，DNS 无需改动）
 
 ## 同步机制
 
