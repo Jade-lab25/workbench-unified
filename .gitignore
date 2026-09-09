@@ -1,0 +1,20 @@
+# 密钥与本地配置（严禁入库）
+**/.env
+.env
+.env.*
+!.env.example
+
+# 依赖与构建产物
+node_modules/
+dist/
+dist.zip
+*.zip
+
+# 只读存档 / 本地技能 / 临时素材
+_originals/
+.agents/
+/_*.png
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
