@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { User, KeyRound, Database, Upload, Download, LogOut, HardDrive, Cloud, ShieldCheck, Info } from 'lucide-react';
 import type { AppState } from '../types';
-import { PROVIDERS } from '../utils/llm';
+import { PROVIDERS, loadLLMConfig, saveLLMConfig } from '../utils/llm';
 
 interface Props {
   state: AppState;
@@ -17,17 +17,17 @@ interface Props {
   toast: (t: string, type?: 'info' | 'success' | 'error') => void;
 }
 
-export function SettingsView({ state, store, userId, authMode, userEmail, syncState, onPerformSync, onFetchFromCloud, onLogout, onSwitchLocal, toast }: Props) {
-  const s = state.userSettings || { llmProvider: '', llmApiKey: '', llmModel: '' };
-  const [provider, setProvider] = useState(s.llmProvider || 'deepseek');
-  const [model, setModel] = useState(s.llmModel || '');
-  const [apiKey, setApiKey] = useState(s.llmApiKey || '');
-  const [customEndpoint, setCustomEndpoint] = useState('');
+export function SettingsView({ store, userId, authMode, userEmail, syncState, onPerformSync, onFetchFromCloud, onLogout, onSwitchLocal, toast }: Props) {
+  const llmInit = loadLLMConfig();
+  const [provider, setProvider] = useState(llmInit.provider || 'deepseek');
+  const [model, setModel] = useState(llmInit.model || '');
+  const [apiKey, setApiKey] = useState(llmInit.apiKey || '');
+  const [customEndpoint, setCustomEndpoint] = useState(llmInit.customEndpoint || '');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const saveSettings = () => {
-    store.saveUserSettings({ llmProvider: provider, llmApiKey: apiKey.trim(), llmModel: model.trim() });
-    toast('设置已保存，将随云同步到其他设备', 'success');
+    saveLLMConfig({ provider, apiKey: apiKey.trim(), model: model.trim(), customEndpoint: customEndpoint.trim() });
+    toast('设置已保存到本机浏览器（不上传任何服务器）', 'success');
   };
 
   const doExport = () => {
@@ -135,7 +135,7 @@ export function SettingsView({ state, store, userId, authMode, userEmail, syncSt
                 <input className="input mono" type="password" placeholder="sk-…" value={apiKey} onChange={e => setApiKey(e.target.value)} /></div>
               <button className="btn btn-primary" onClick={saveSettings}>保存设置</button>
               <div className="tiny muted-3">
-                Key 加密存于你的 Supabase 用户设置（RLS 仅本人可读），换设备登录自动带上；生成时由浏览器直连调用，60 秒超时。
+                Key 仅保存在本机浏览器 localStorage，不上传任何服务器；换设备需重新填写。生成时由浏览器直连调用，60 秒超时。
               </div>
             </div>
           </div>
@@ -145,7 +145,7 @@ export function SettingsView({ state, store, userId, authMode, userEmail, syncSt
             <div className="col" style={{ gap: 8, fontSize: 12.5, color: 'var(--text-2)' }}>
               <div>· 全部 16 张数据表启用 RLS，仅本人可读写</div>
               <div>· Supabase 建议关闭「允许新用户注册」，锁死唯一账号</div>
-              <div>· API Key 不写入前端代码，仅存云端用户设置</div>
+              <div>· API Key 仅存本机浏览器 localStorage，不写入代码、不上传服务器</div>
             </div>
             <div style={{ borderTop: '1px solid var(--border)', margin: '14px 0 10px' }} />
             <div className="row" style={{ gap: 8, color: 'var(--text-3)', fontSize: 12 }}>

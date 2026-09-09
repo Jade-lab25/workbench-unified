@@ -3,9 +3,9 @@ import {
   Sparkles, Lightbulb, ClipboardList, Plus, Trash2, Pencil, Save, History, Loader2, KeyRound,
   ChevronLeft, ChevronRight, Wand2,
 } from 'lucide-react';
-import type { AppState, SummaryIdea, UserSettings } from '../types';
+import type { AppState, SummaryIdea } from '../types';
 import { Seg, Modal, Empty, Markdown } from '../components/ui';
-import { PROVIDERS, TEMPLATES, generateWithLLM } from '../utils/llm';
+import { PROVIDERS, TEMPLATES, generateWithLLM, loadLLMConfig, saveLLMConfig } from '../utils/llm';
 import { todayISO, weekRange, fmtDate } from '../utils/dates';
 
 type Sub = 'generate' | 'ideas' | 'logs';
@@ -45,16 +45,17 @@ export function SummaryView({ state, store, toast }: Props) {
 
 /* ═══════════ 总结生成 ═══════════ */
 function GeneratePane({ state, store, toast }: any) {
-  const settings: UserSettings = state.userSettings || { llmProvider: '', llmApiKey: '', llmModel: '' };
+  const llmInit = loadLLMConfig();
   const [rangeKind, setRangeKind] = useState<'weekly' | 'daily' | 'custom'>('weekly');
   const [customStart, setCustomStart] = useState(todayISO());
   const [customEnd, setCustomEnd] = useState(todayISO());
   const [templateCode, setTemplateCode] = useState('A');
   const [showSettings, setShowSettings] = useState(false);
-  const [provider, setProvider] = useState(settings.llmProvider || 'deepseek');
-  const [model, setModel] = useState(settings.llmModel || '');
-  const [apiKey, setApiKey] = useState(settings.llmApiKey || '');
-  const [customEndpoint, setCustomEndpoint] = useState('');
+  const [dirFilter, setDirFilter] = useState<'work' | 'all' | 'growth'>('work');
+  const [provider, setProvider] = useState(llmInit.provider || 'deepseek');
+  const [model, setModel] = useState(llmInit.model || '');
+  const [apiKey, setApiKey] = useState(llmInit.apiKey || '');
+  const [customEndpoint, setCustomEndpoint] = useState(llmInit.customEndpoint || '');
   const [extraMaterial, setExtraMaterial] = useState('');
   const [result, setResult] = useState('');
   const [generating, setGenerating] = useState(false);
@@ -73,7 +74,7 @@ function GeneratePane({ state, store, toast }: any) {
 
   const kindLabel = rangeKind === 'daily' ? '日报' : rangeKind === 'weekly' ? '周报' : '总结';
 
-  /** 聚合素材：灵感 + 工作日志（范围内，按方向分组）+ 手动补充 */
+  /** 聚合素材：灵感 + 工作日志（范围内，按方向筛选）+ 手动补充 */
   const gather = useMemo(() => {
     const work: string[] = [];
     const growth: string[] = [];
@@ -92,13 +93,15 @@ function GeneratePane({ state, store, toast }: any) {
     if (extraMaterial.trim()) {
       work.push(`【手动补充】${extraMaterial.trim()}`);
     }
+    if (dirFilter === 'work') growth.length = 0;
+    if (dirFilter === 'growth') work.length = 0;
     return { work, growth };
-  }, [state.summaryLogs, state.summaryIdeas, extraMaterial, range]);
+  }, [state.summaryLogs, state.summaryIdeas, extraMaterial, range, dirFilter]);
 
   const saveSettings = () => {
-    store.saveUserSettings({ llmProvider: provider, llmApiKey: apiKey.trim(), llmModel: model.trim() });
+    saveLLMConfig({ provider, apiKey: apiKey.trim(), model: model.trim(), customEndpoint: customEndpoint.trim() });
     setShowSettings(false);
-    toast('API 设置已保存', 'success');
+    toast('API 设置已保存到本机浏览器', 'success');
   };
 
   const handleGenerate = async () => {
@@ -194,6 +197,14 @@ function GeneratePane({ state, store, toast }: any) {
               <span className="small bold">{range.start}{range.start !== range.end ? ' ~ ' + range.end : ''}</span>
             </div>
             <div className="field">
+              <label className="field-label">素材方向</label>
+              <div className="seg">
+                <button className={`seg-item${dirFilter === 'work' ? ' active' : ''}`} onClick={() => setDirFilter('work')}>工作</button>
+                <button className={`seg-item${dirFilter === 'all' ? ' active' : ''}`} onClick={() => setDirFilter('all')}>全部</button>
+                <button className={`seg-item${dirFilter === 'growth' ? ' active' : ''}`} onClick={() => setDirFilter('growth')}>成长</button>
+              </div>
+            </div>
+            <div className="field">
               <label className="field-label">补充素材（可选，仅本次生成使用）</label>
               <textarea className="textarea" rows={2} placeholder="粘贴额外素材：项目进展、数据、沟通结论…" value={extraMaterial} onChange={e => setExtraMaterial(e.target.value)} />
             </div>
@@ -203,7 +214,7 @@ function GeneratePane({ state, store, toast }: any) {
             </button>
             {errorMsg && <div style={{ padding: '9px 12px', borderRadius: 10, background: 'var(--red-soft)', color: 'var(--red)', fontSize: 12.5 }}>{errorMsg}</div>}
             <div className="tiny muted-3">
-              素材自动聚合：范围内的工作日志 + 灵感（按 工作/个人成长 分组），共 {gather.work.length + gather.growth.length} 条
+              素材自动聚合：范围内的工作日志 + 灵感（当前方向：{dirFilter === 'all' ? '工作+成长' : dirFilter === 'work' ? '工作' : '成长'}），共 {gather.work.length + gather.growth.length} 条
             </div>
           </div>
         </div>
@@ -262,7 +273,7 @@ function GeneratePane({ state, store, toast }: any) {
           </div>
           <div className="field"><label className="field-label">API Key</label>
             <input className="input mono" type="password" placeholder="sk-…" value={apiKey} onChange={e => setApiKey(e.target.value)} /></div>
-          <div className="tiny muted-3">Key 保存到你的 Supabase（仅本人可见），换设备登录自动带上；浏览器直连调用，60 秒超时。</div>
+          <div className="tiny muted-3">Key 仅保存在本机浏览器 localStorage，不上传任何服务器；换设备需重新填写。浏览器直连调用，60 秒超时。</div>
           <button className="btn btn-primary" onClick={saveSettings}>保存设置</button>
         </div>
       </Modal>

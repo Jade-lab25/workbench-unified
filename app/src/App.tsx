@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Menu } from 'lucide-react';
 import { useAppState } from './store';
-import { Sidebar, SidebarBody, type TabType } from './components/Sidebar';
+import { Sidebar, SidebarBody, NAV_ITEMS, type TabType } from './components/Sidebar';
 import { useSync } from './hooks/useSync';
 import { auth as supabaseAuth } from './supabase/database';
 import { useToast } from './components/ui';
@@ -112,19 +112,20 @@ function App() {
     toast('已退出登录');
   };
 
-  // 侧边栏角标：今日=待办数，目标=逾期+今日到期，工作=未完成待办
-  const sidebarCounts = useMemo(() => {
+  // 侧边栏/底部角标：今日=今天要处理（逾期/今天到期/进行中），目标=进行中目标数，工作=未完成待办
+  const sidebarCounts = useMemo<Partial<Record<TabType, number>>>(() => {
     const t = todayISO();
-    const dueToday = state.fdTasks.filter(x => x.fdType === 'task' && x.status !== 'done' && x.status !== 'archived' && x.dueDate === t).length;
-    const overdue = state.fdTasks.filter(x => x.fdType === 'task' && x.status !== 'done' && x.status !== 'archived' && x.dueDate && x.dueDate < t).length;
+    const todayDue = state.fdTasks.filter(x =>
+      x.fdType === 'task' && x.status !== 'done' && x.status !== 'archived' &&
+      ((x.dueDate && x.dueDate <= t) || x.status === 'doing'),
+    ).length;
     const pendingTodos = state.todos.filter(x => !x.isCompleted).length;
-    const habitDue = state.fdHabits.filter(h => h.weekdays.includes((new Date().getDay() + 6) % 7)).length;
     return {
-      today: pendingTodos + habitDue,
-      goals: dueToday + overdue,
+      today: todayDue,
+      goals: state.fdGoals.filter(g => g.status !== 'done').length,
       work: pendingTodos,
     };
-  }, [state.todos, state.fdTasks, state.fdHabits]);
+  }, [state.todos, state.fdTasks, state.fdGoals]);
 
   const commonProps = { state, store, userId, toast };
 
@@ -196,6 +197,21 @@ function App() {
           )}
         </main>
       </div>
+
+      {/* 移动端底部导航（≤900px 显示） */}
+      <nav className="tabbar" aria-label="底部导航">
+        {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            className={`tab-item${activeTab === key ? ' active' : ''}`}
+            onClick={() => { setActiveTab(key); setDrawerOpen(false); }}
+          >
+            <span className="tab-ic"><Icon size={17} strokeWidth={2} /></span>
+            <span className="tab-label">{label}</span>
+            {sidebarCounts?.[key] ? <span className="tab-count">{sidebarCounts[key]}</span> : null}
+          </button>
+        ))}
+      </nav>
       {toastNode}
     </div>
   );

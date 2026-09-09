@@ -265,6 +265,31 @@ export const TEMPLATES: TemplateDef[] = [
   },
 ];
 
+export interface LLMConfig {
+  provider: string;
+  apiKey: string;
+  model: string;
+  customEndpoint: string;
+}
+
+const LLM_STORAGE_KEY = 'workbench.llm';
+
+/** LLM 配置只存浏览器 localStorage（隐私优先，不上传任何服务器） */
+export function loadLLMConfig(): LLMConfig {
+  const fallback: LLMConfig = { provider: 'deepseek', apiKey: '', model: '', customEndpoint: '' };
+  try {
+    const raw = localStorage.getItem(LLM_STORAGE_KEY);
+    if (!raw) return fallback;
+    return { ...fallback, ...JSON.parse(raw) };
+  } catch {
+    return fallback;
+  }
+}
+
+export function saveLLMConfig(cfg: LLMConfig): void {
+  localStorage.setItem(LLM_STORAGE_KEY, JSON.stringify(cfg));
+}
+
 export const POLISH_GUIDE = [
   '1. 只使用素材中出现的信息，绝不编造数据或事实；',
   '2. 尽量量化：数字、百分比、对比变化优先呈现；',

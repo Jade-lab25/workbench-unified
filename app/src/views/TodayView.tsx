@@ -6,6 +6,7 @@ import {
 import type { AppState, FdTask } from '../types';
 import { dailyWorkStats, computeHabitStats, goalProgress } from '../utils/stats';
 import { todayISO, fmtDuration, fmtTime, parseISO } from '../utils/dates';
+import { TaskEditor } from './GoalsView';
 
 interface Props {
   state: AppState;
@@ -31,12 +32,12 @@ export function TodayView({ state, store, toast }: Props) {
   );
 
   const pendingTodos = state.todos.filter(t => !t.isCompleted);
-  const dueTasks = useMemo(() => state.fdTasks.filter(t =>
-    t.fdType === 'task' && t.status !== 'done' && t.status !== 'archived' && t.dueDate === today,
+  // 原版口径：未完成 +（逾期 或 今天到期 或 进行中）
+  const todayDueTasks = useMemo(() => state.fdTasks.filter(t =>
+    t.fdType === 'task' && t.status !== 'done' && t.status !== 'archived' && t.status !== 'idea' &&
+    ((t.dueDate && t.dueDate <= today) || t.status === 'doing'),
   ), [state.fdTasks, today]);
-  const overdueTasks = useMemo(() => state.fdTasks.filter(t =>
-    t.fdType === 'task' && t.status !== 'done' && t.status !== 'archived' && t.dueDate && t.dueDate < today,
-  ), [state.fdTasks, today]);
+  const [editTask, setEditTask] = useState<FdTask | null>(null);
 
   const wd = (new Date().getDay() + 6) % 7;
   const dueHabits = state.fdHabits.filter(h => (h.weekdays || []).includes(wd));
@@ -66,6 +67,16 @@ export function TodayView({ state, store, toast }: Props) {
     setNewLog('');
     toast('工作日志已记录', 'success');
   };
+
+  // 旧版口径：截止日期升序，有日期在前、无日期置后
+  const sortedTodayTasks = useMemo(() => {
+    return [...todayDueTasks].sort((a, b) => {
+      if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
+      return (b.createdAt || '').localeCompare(a.createdAt || '');
+    });
+  }, [todayDueTasks]);
 
   return (
     <div>
@@ -143,24 +154,21 @@ export function TodayView({ state, store, toast }: Props) {
           )}
         </div>
 
-        {/* 今日到期任务 + 逾期 */}
+        {/* 今天要处理：今天到期 + 已逾期（旧版口径） */}
         <div className="card">
           <div className="card-head">
-            <div className="card-title"><Target size={16} /> 目标任务</div>
-            {(dueTasks.length + overdueTasks.length) > 0 && <span className="badge badge-red">{dueTasks.length + overdueTasks.length}</span>}
+            <div className="card-title"><Target size={16} /> 今天要处理</div>
+            {todayDueTasks.length > 0 && <span className="badge badge-red">{todayDueTasks.length}</span>}
           </div>
-          {dueTasks.length === 0 && overdueTasks.length === 0 ? (
+          {todayDueTasks.length === 0 ? (
             <div className="empty" style={{ padding: '20px 8px' }}>
               <span className="ic"><Target size={26} /></span>
-              <div className="empty-text">今天没有到期任务</div>
+              <div className="empty-text">没有今天到期或逾期的任务</div>
             </div>
           ) : (
             <div className="col" style={{ gap: 6 }}>
-              {overdueTasks.slice(0, 4).map(t => (
-                <TaskRow key={t.id} task={t} state={state} store={store} overdue />
-              ))}
-              {dueTasks.slice(0, 6).map(t => (
-                <TaskRow key={t.id} task={t} state={state} store={store} />
+              {sortedTodayTasks.map(t => (
+                <TaskRow key={t.id} task={t} state={state} store={store} onEdit={() => setEditTask(t)} />
               ))}
             </div>
           )}
@@ -244,13 +252,19 @@ export function TodayView({ state, store, toast }: Props) {
           </div>
         </div>
       </div>
+
+      {editTask && <TaskEditor task={editTask} state={state} store={store} toast={toast} onClose={() => setEditTask(null)} />}
     </div>
   );
 }
 
-function TaskRow({ task, state, store, overdue }: { task: FdTask; state: AppState; store: any; overdue?: boolean }) {
+function TaskRow({ task, state, store, onEdit }: { task: FdTask; state: AppState; store: any; onEdit: () => void }) {
   const g = state.fdGoals.find(x => x.id === task.goalId);
   const progress = goalProgress(task);
+  const today = todayISO();
+  const overdue = !!task.dueDate && task.dueDate < today;
+  const md = (d: string) => { const p = d.split('-'); return `${+p[1]}月${+p[2]}日`; };
+  const prioClass = task.priority === 'P0' ? 'badge-red' : task.priority === 'P1' ? 'badge-amber' : 'badge-slate';
   return (
     <div className="list-item" style={{ padding: '8px 2px' }}>
       <button
@@ -260,17 +274,26 @@ function TaskRow({ task, state, store, overdue }: { task: FdTask; state: AppStat
       >
         <Circle size={18} />
       </button>
-      <div className="list-item-main">
+      <button
+        className="list-item-main" style={{ textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, font: 'inherit' }}
+        onClick={onEdit}
+        title="点击编辑"
+      >
         <div className="list-item-title" style={{ fontSize: 13 }}>
-          {overdue && <span className="badge badge-red" style={{ marginRight: 6 }}>逾期</span>}
-          {task.priority && <span className={`badge ${task.priority === 'P0' ? 'badge-red' : 'badge-amber'}`} style={{ marginRight: 6 }}>{task.priority}</span>}
+          {task.priority && <span className={`badge ${prioClass}`} style={{ marginRight: 6 }}>{task.priority}</span>}
           {task.title}
         </div>
         <div className="list-item-sub">
           {g && <span className="badge badge-slate" style={{ marginRight: 6 }}>{g.title}</span>}
+          {task.dueDate === today && <span className="badge badge-accent" style={{ marginRight: 6 }}>今天</span>}
+          {task.dueDate && task.dueDate !== today && (
+            <span className={`badge ${overdue ? 'badge-red' : 'badge-muted'}`} style={{ marginRight: 6 }}>
+              {overdue ? `已逾期 · 截止 ${md(task.dueDate)}` : `截止 ${md(task.dueDate)}`}
+            </span>
+          )}
           {progress > 0 && <span className="tiny muted-3">拆解 {progress}%</span>}
         </div>
-      </div>
+      </button>
       <button className="btn-icon danger" onClick={() => store.deleteFdTask(task.id)} title="删除">×</button>
     </div>
   );

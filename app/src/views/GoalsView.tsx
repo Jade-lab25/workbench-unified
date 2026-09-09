@@ -104,7 +104,7 @@ export function GoalsView({ state, store, toast }: Props) {
             const gts = goalTasks(g.id);
             const all = gts.reduce((s, t) => s + countAllSubtasks(t.subtasks), 0);
             const doneSub = gts.reduce((s, t) => s + countDoneSubtasks(t.subtasks), 0);
-            const open = !!expanded[g.id];
+            const open = expanded[g.id] !== false; // 默认展开（对齐原版"列表即编辑"密度）
             return (
               <div className="card" key={g.id}>
                 <div className="row-between">
@@ -140,7 +140,7 @@ export function GoalsView({ state, store, toast }: Props) {
                         <button className="list-item-main" style={{ textAlign: 'left' }} onClick={() => setEditingTaskId(t.id)}>
                           <div className={`list-item-title${t.status === 'done' ? ' done' : ''}`}>{t.title}</div>
                           <div className="list-item-sub">
-                            {t.priority && <span className={`badge ${t.priority === 'P0' ? 'badge-red' : 'badge-amber'}`} style={{ marginRight: 6 }}>{t.priority}</span>}
+                            {t.priority && <span className={`badge ${t.priority === 'P0' ? 'badge-red' : t.priority === 'P1' ? 'badge-amber' : t.priority === 'P2' ? 'badge-slate' : 'badge-muted'}`} style={{ marginRight: 6 }}>{t.priority}</span>}
                             {t.dueDate && <span className="badge badge-muted">{fmtDate(t.dueDate)}{t.dueDate < today ? ' 已逾期' : ''}</span>}
                             {countAllSubtasks(t.subtasks) > 0 && <span className="badge badge-slate" style={{ marginLeft: 6 }}>{countDoneSubtasks(t.subtasks)}/{countAllSubtasks(t.subtasks)} 拆解</span>}
                           </div>
