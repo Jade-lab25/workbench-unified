@@ -188,7 +188,7 @@ export function CalendarView({ state, selectedDate, onSelectDate, store, toast }
           <div className="cal-sum-value" style={{ fontSize: 15 }}>{fmtClock(summary.time)}</div></div>
       </div>
 
-      <div className="grid-2" style={{ gridTemplateColumns: 'minmax(0,1.7fr) minmax(280px,1fr)' }}>
+      <div className="cal-layout">
         <div className="card">
           {/* 导航 */}
           <div className="row-between mb12">
@@ -242,10 +242,10 @@ export function CalendarView({ state, selectedDate, onSelectDate, store, toast }
           </div>
 
           {/* 图例 */}
-          <div className="row mt12 wrap" style={{ gap: 12 }}>
+          <div className="cal-legend">
             {[['var(--red)', 'P0'], ['var(--amber)', 'P1'], ['var(--green)', '待办✓'], ['var(--accent)', '任务◆'], ['var(--amber)', '打卡'], ['var(--teal)', '习惯'], ['var(--slate)', '日志'], ['var(--violet)', '灵感']].map(([c, l]) => (
-              <span key={l as string} className="row" style={{ gap: 4, fontSize: 11.5, color: 'var(--text-2)' }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: c as string, display: 'inline-block' }} />{l}
+              <span key={l as string} className="cal-legend-item">
+                <span className="cal-legend-dot" style={{ background: c as string }} />{l}
               </span>
             ))}
           </div>
